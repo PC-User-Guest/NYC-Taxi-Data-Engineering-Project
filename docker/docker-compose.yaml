@@ -1,0 +1,41 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ../sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nyc_net
+    ports:
+      - "15432:5432"
+
+  pgadmin:
+    image: dpage/pgadmin4:7.4
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - nyc_net
+    ports:
+      - "8080:80"
+
+networks:
+  nyc_net:
+    driver: bridge
+
+volumes:
+  db_data:
+    name: nyc_taxi_db_data
