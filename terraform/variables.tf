@@ -54,7 +54,22 @@ variable "repo_branch" {
 variable "ssh_cidr" {
 	description = "CIDR allowed for SSH access"
 	type        = string
-	default     = "0.0.0.0/0"
+	# Require operator to set a narrow CIDR (no open default)
+	default     = ""
+	validation {
+		condition     = length(var.ssh_cidr) > 0
+		error_message = "ssh_cidr must be set to a single trusted CIDR (do not use 0.0.0.0/0)"
+	}
+}
+
+variable "admin_cidr" {
+	description = "CIDR allowed for admin HTTP access (pgAdmin). Set to the same as ssh_cidr to restrict access."
+	type        = string
+	default     = ""
+	validation {
+		condition     = length(var.admin_cidr) > 0
+		error_message = "admin_cidr must be set to a single trusted CIDR for pgAdmin access"
+	}
 }
 
 

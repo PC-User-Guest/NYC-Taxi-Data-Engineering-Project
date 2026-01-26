@@ -1,107 +1,120 @@
 # NYC Taxi Data Engineering Project
 
-Overview
---------
-This repository implements a turnkey NYC Taxi data engineering pipeline that runs on a small GCP VM (Always Free eligible), using Dockerized PostgreSQL + pgAdmin for local analytics, and provisions a GCS bucket and BigQuery dataset via Terraform.
+Project overview
+----------------
+This repository is a turnkey NYC Taxi data engineering pipeline designed for teaching
+and small-scale analytics on GCP's Always Free tier. It demonstrates infrastructure as
+code (Terraform), containerized services (Docker Compose), idempotent ingestion with
+Python, and basic analytics in Postgres.
 
-Architecture
-------------
-- GCP Compute Engine f1-micro instance that boots, installs Docker, and runs the project via `docker-compose`.
-- Docker Compose runs PostgreSQL 16 and pgAdmin.
-- Terraform provisions a GCS bucket and a BigQuery dataset.
-- A systemd service runs `python/ingest_data.py` to load the Green taxi Parquet and zone CSV into Postgres.
+Goals:
+- Reproducible: deployable with `terraform` and a single VM.
+- Educational: clear, well-documented code suitable for students and reviewers.
+- Secure-by-default: firewall and IAM patterns that avoid accidental exposure.
 
-Quick Setup
------------
-1. Install Terraform and configure `gcloud` with the desired project.
-2. Edit `terraform/terraform.tfvars` and set `project = "your-gcp-project-id"`. Optionally set `repo_url` to a Git URL where this repository is hosted so the VM can clone it at boot.
-3. Run:
-
-```bash
-terraform init
-terraform apply -auto-approve
+Repository layout
+-----------------
+```
+README.md
+requirements.txt
+ .env.example
+docker/
+	docker-compose.yaml
+python/
+	ingest_data.py
+sql/
+	create_user.sql
+	init.sql
+terraform/
+	main.tf
+	variables.tf
+	outputs.tf
+	terraform.tfvars
+data/  # runtime, not committed
 ```
 
-What the apply does
--------------------
-- Creates a GCE f1-micro VM with a startup script that installs Docker, Docker Compose, Python, clones the repo (if `repo_url` provided), and starts the services.
-- Creates a GCS bucket (`bucket_name`) and a BigQuery dataset (`bq_dataset`).
-
-Accessing Services
-------------------
-- pgAdmin: http://<instance-ip>:8080 (credentials stored in `.env` as `PGADMIN_EMAIL` / `PGADMIN_PASSWORD`)
-- Postgres: host `<instance-ip>`, port `15432`, database and user configured via `.env` (`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`).
-
-Running Locally (without Terraform)
-----------------------------------
-You can run the stack locally with Docker Compose:
+Quick setup (high level)
+------------------------
+1. Install `terraform` and `gcloud` and authenticate to your GCP project.
+2. Copy `.env.example` to `.env` and fill in secrets (do NOT commit `.env`).
+3. Edit `terraform/terraform.tfvars` and set the required fields including
+	 `project`, `ssh_cidr` and `admin_cidr` (both must be narrow CIDRs; do not use 0.0.0.0/0).
+4. Run the following to validate and plan:
 
 ```bash
+cd terraform
+terraform init
+terraform validate
+terraform plan -var-file=terraform.tfvars
+```
+
+When ready, apply:
+
+```bash
+terraform apply -var-file=terraform.tfvars -auto-approve
+```
+
+Important notes on security and Always Free
+-----------------------------------------
+- The Terraform configuration is designed to run on an Always Free VM (`f1-micro`).
+- `ssh_cidr` and `admin_cidr` are required and must be set to a single trusted CIDR.
+- PostgreSQL is intentionally not exposed publicly at the firewall level; pgAdmin
+	is restricted to `admin_cidr`.
+- Startup scripts do not print environment variables; `.env` is read with restrictive
+	permissions on the VM.
+
+Running locally (development)
+-----------------------------
+To run the stack on your workstation for development:
+
+```bash
+cp .env.example .env
+# Edit .env with strong local credentials
 cd docker
 docker compose up -d
-```
 
-Then to run ingestion manually:
-
-```bash
+# Run ingestion manually (uses .env)
 python3 python/ingest_data.py
 ```
 
 Testing analytical queries
 --------------------------
-After ingestion, connect to Postgres and run queries to answer the analytical requirements. Example SQL:
+After ingestion, connect to Postgres and run the analytical queries in `README.md`.
+Example queries for the assignment are included below and in the original README.
 
-1) Trips in Nov 2025 with trip_distance <= 1:
+Developer / teaching notes
+--------------------------
+- `python/ingest_data.py` is written to be readable for learners: functions have
+	docstrings, mapping logic is explicit, and chunked ingestion demonstrates
+	memory-efficient processing using `pyarrow.dataset`.
+- `sql/init.sql` contains schema definitions and helpful indexes for the analytical
+	queries. These indexes are lightweight and appropriate for small datasets.
+- `docker/docker-compose.yaml` documents port exposure and recommended resource
+	considerations for Always Free VMs. By default the repo exposes `15432` and `8080`
+	on the VM; firewall rules in `terraform/` restrict external access.
 
-```sql
-SELECT count(*) FROM nyc.taxi_trips
-WHERE pickup_datetime >= '2025-11-01' AND pickup_datetime < '2025-12-01'
-AND trip_distance <= 1;
+How to run the final validation (suggested checklist)
+---------------------------------------------------
+1. Terraform validate/plan (see above).
+2. After `terraform apply` completes, check the VM IP output: `terraform output instance_ip`.
+3. From an allowed IP (per `ssh_cidr` / `admin_cidr`), verify containers and service:
+
+```bash
+gcloud compute ssh <instance> --zone <zone> --project <project> --command "\
+	docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' ; \
+	systemctl status nyc_taxi_ingest.service --no-pager || true ; \
+	journalctl -u nyc_taxi_ingest.service -n 200 --no-pager || true"
 ```
 
-2) Pickup day with the longest trip (trip_distance < 100):
+4. Connect to Postgres (pgAdmin or psql) and run the validation counts and analytical queries.
 
-```sql
-SELECT date_trunc('day', pickup_datetime) as day,
-	   max(trip_distance) as max_trip
-FROM nyc.taxi_trips
-WHERE trip_distance < 100
-GROUP BY day
-ORDER BY max_trip DESC
-LIMIT 1;
-```
+Packaging & archiving
+---------------------
+- `.env` is excluded from version control. Use `.env.example` as the template for users.
+- Terraform state files and local data are excluded by `.gitignore`.
 
-3) Pickup zone with largest total_amount on Nov 18, 2025:
-
-```sql
-SELECT z.zone, SUM(t.total_amount) as total
-FROM nyc.taxi_trips t
-JOIN nyc.taxi_zones z ON z.location_id = t.pickup_location_id
-WHERE t.pickup_datetime >= '2025-11-18' AND t.pickup_datetime < '2025-11-19'
-GROUP BY z.zone
-ORDER BY total DESC
-LIMIT 1;
-```
-
-4) For pickups in "East Harlem North", which dropoff zone had largest total tip:
-
-```sql
-SELECT z2.zone, SUM(t.tip_amount) as total_tips
-FROM nyc.taxi_trips t
-JOIN nyc.taxi_zones z1 ON z1.location_id = t.pickup_location_id
-JOIN nyc.taxi_zones z2 ON z2.location_id = t.dropoff_location_id
-WHERE z1.zone = 'East Harlem North'
-GROUP BY z2.zone
-ORDER BY total_tips DESC
-LIMIT 1;
-```
-
-Archiving
----------
-- This repo is self-contained. To archive, create a tarball of the repository root.
-
-Notes & Assumptions
--------------------
-- The Terraform startup script can clone this repo if `repo_url` is provided. If you prefer to embed the repo in a bucket, upload a `repo.tar.gz` to the created GCS bucket with the same path.
-- The ingestion script prefers local copies in `data/` and will download the required datasets when missing.
+Contact / contributions
+-----------------------
+This project is intended for educational use. Pull requests and issues are welcome.
+When contributing, avoid committing secrets and follow the project's security notes.
 

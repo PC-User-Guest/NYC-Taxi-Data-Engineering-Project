@@ -16,6 +16,11 @@ services:
       retries: 5
     networks:
       - nyc_net
+    # Exposes Postgres on the VM host at port 15432. The Terraform firewall
+    # intentionally blocks external access to this port; only use if you
+    # understand the network rules. For local development you may keep this
+    # mapping; for stricter setups, remove the `ports` section so Postgres is
+    # accessible only via the Docker network.
     ports:
       - "15432:5432"
 
@@ -29,6 +34,7 @@ services:
         condition: service_healthy
     networks:
       - nyc_net
+    # pgAdmin exposes an admin UI. Terraform restricts access to `admin_cidr`.
     ports:
       - "8080:80"
 

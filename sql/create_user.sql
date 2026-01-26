@@ -1,4 +1,7 @@
--- idempotent user and database creation
+-- Idempotent user and database creation for local Postgres (used in Docker)
+-- This script attempts safe operations during container initialization and
+-- will not fail the startup if the DB already exists.
+
 DO
 $$
 BEGIN
@@ -27,7 +30,9 @@ BEGIN
 END
 $$;
 
--- grant privileges on database if it exists
+-- Grant minimal privileges on the database if present. In a production
+-- deployment you would create an explicit user with a password; for local
+-- teaching deployments the Docker env supplies credentials.
 DO
 $$
 BEGIN

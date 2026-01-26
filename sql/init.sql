@@ -1,8 +1,14 @@
 -- Initialize schema and tables for NYC taxi analytics
+-- Initialize schema and tables for NYC taxi analytics
+
+-- This file creates a small, analytics-oriented schema suitable for
+-- classroom examples and small-scale experimentation. Naming uses
+-- snake_case and indexes are intentionally lightweight to support
+-- the example analytical queries.
 
 CREATE SCHEMA IF NOT EXISTS nyc;
 
--- Taxi zones lookup
+-- Taxi zones lookup: stable, small reference table used for joins.
 CREATE TABLE IF NOT EXISTS nyc.taxi_zones (
 	location_id INTEGER PRIMARY KEY,
 	borough TEXT,
@@ -10,7 +16,8 @@ CREATE TABLE IF NOT EXISTS nyc.taxi_zones (
 	service_zone TEXT
 );
 
--- Taxi trips (Green Taxi partial schema tuned for analytics)
+-- Taxi trips: a pared-down subset of Green Taxi columns focused on
+-- analytics. We use a BIGSERIAL `trip_id` for a stable primary key.
 CREATE TABLE IF NOT EXISTS nyc.taxi_trips (
 	trip_id BIGSERIAL PRIMARY KEY,
 	vendor_id INTEGER,
@@ -34,7 +41,7 @@ CREATE TABLE IF NOT EXISTS nyc.taxi_trips (
 	congestion_surcharge NUMERIC
 );
 
--- Helpful indexes
+-- Indexes to accelerate the example queries (date range and location joins).
 CREATE INDEX IF NOT EXISTS idx_taxi_trips_pickup_dt ON nyc.taxi_trips (pickup_datetime);
 CREATE INDEX IF NOT EXISTS idx_taxi_trips_pickup_loc ON nyc.taxi_trips (pickup_location_id);
 CREATE INDEX IF NOT EXISTS idx_taxi_trips_dropoff_loc ON nyc.taxi_trips (dropoff_location_id);
