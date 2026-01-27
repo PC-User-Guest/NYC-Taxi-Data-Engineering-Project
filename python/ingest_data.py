@@ -15,6 +15,24 @@ from sqlalchemy import create_engine, text
 LOGGER = logging.getLogger("nyc_taxi_ingest")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
+dtype = {
+    "VendorID": "Int64",
+    "passenger_count": "Int64",
+    "trip_distance": "float64",
+    "RatecodeID": "Int64",
+    "store_and_fwd_flag": "string",
+    "PULocationID": "Int64",
+    "DOLocationID": "Int64",
+    "payment_type": "Int64",
+    "fare_amount": "float64",
+    "extra": "float64",
+    "mta_tax": "float64",
+    "tip_amount": "float64",
+    "tolls_amount": "float64",
+    "improvement_surcharge": "float64",
+    "total_amount": "float64",
+    "congestion_surcharge": "float64"
+}
 
 # Configuration (read from environment or .env). Do NOT hardcode secrets here.
 DB_HOST = os.environ.get("PG_HOST", "localhost")
@@ -147,14 +165,14 @@ def load_trips_chunked(engine, parquet_path: Path, chunk_size: int = CHUNK_SIZE)
 	with engine.begin() as conn:
 		conn.execute(text("DELETE FROM nyc.taxi_trips WHERE pickup_datetime >= :start AND pickup_datetime < :end"), {"start": start, "end": end})
 
-	dataset = ds.dataset(str(parquet_path), format="parquet")
-	# Use the pyarrow scanner to iterate record batches
-	scanner = dataset.scan()
-	batches = scanner.to_batches(batch_size=chunk_size)
+	# Use pyarrow.parquet.ParquetFile to iterate row-groups to avoid high memory
+	import pyarrow.parquet as pq
 
+	pf = pq.ParquetFile(str(parquet_path))
 	total_rows = 0
-	for batch in tqdm(batches, desc="Ingesting parquet batches"):
-		batch_df = batch.to_pandas()
+	for rg in range(pf.num_row_groups):
+		table = pf.read_row_group(rg)
+		batch_df = table.to_pandas()
 		mapped = _map_columns(batch_df)
 		if len(mapped) == 0:
 			continue
