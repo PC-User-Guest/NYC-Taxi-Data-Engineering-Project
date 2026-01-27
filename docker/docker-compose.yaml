@@ -22,10 +22,10 @@ services:
     # mapping; for stricter setups, remove the `ports` section so Postgres is
     # accessible only via the Docker network.
     ports:
-      - "15432:5432"
+      - "5433:5432"
 
   pgadmin:
-    image: dpage/pgadmin4:7.4
+    image: dpage/pgadmin4:latest
     restart: unless-stopped
     env_file:
       - ../.env
