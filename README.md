@@ -2,14 +2,13 @@
 
 Project overview
 ----------------
-This repository is a turnkey NYC Taxi data engineering pipeline designed for teaching
-and small-scale analytics on GCP's Always Free tier. It demonstrates infrastructure as
+This repository is a turnkey NYC Taxi data engineering pipeline designed as part of the learning process in the DataTalks Club 2026 Data Engineering Zoomcamp course. It may be classified as a small-scale analytics project on GCP's Always Free tier, as well as demonstrates the application of infrastructure as
 code (Terraform), containerized services (Docker Compose), idempotent ingestion with
 Python, and basic analytics in Postgres.
 
 Goals:
 - Reproducible: deployable with `terraform` and a single VM.
-- Educational: clear, well-documented code suitable for students and reviewers.
+- Educational: clear, well-documented code suitable for fellow students and reviewers.
 - Secure-by-default: firewall and IAM patterns that avoid accidental exposure.
 
 Repository layout
