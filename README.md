@@ -89,7 +89,7 @@ Developer / teaching notes
 - `sql/init.sql` contains schema definitions and helpful indexes for the analytical
 	queries. These indexes are lightweight and appropriate for small datasets.
 - `docker/docker-compose.yaml` documents port exposure and recommended resource
-	considerations for Always Free VMs. By default the repo exposes `15432` and `8080`
+	considerations for Always Free VMs. By default the repo exposes `5432` and `8080`
 	on the VM; firewall rules in `terraform/` restrict external access.
 
 How to run the final validation (suggested checklist)
@@ -114,6 +114,6 @@ Packaging & archiving
 
 Contact / contributions
 -----------------------
-This project is intended for educational use. Pull requests and issues are welcome.
+This project is intended for educational use. Development is ongoing. Pull requests and issues are welcome.
 When contributing, avoid committing secrets and follow the project's security notes.
 
